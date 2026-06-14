@@ -1,0 +1,27 @@
+# Video Best Frames — Configuration
+# Usage: python video_best_frames.py --config config.yaml --input video.mp4
+
+mode: segment                  # Toujours en mode segment
+segment_duration: 3.0          # Secondes autour de chaque moment
+sample_rate: 0.5               # Finesse d'analyse (secondes)
+max_frames_per_video: 30       # Maximum de frames par vidéo
+output_root: ./best_photos     # Dossier de sortie
+
+# Détection
+use_clip: true                 # Activer CLIP (meilleur mais plus lent)
+clip_model: "openai/clip-vit-base-patch32"
+scene_weight: 0.3              # Poids des changements de scène
+speech_weight: 0.3             # Poids des segments de parole
+emotion_weight: 0.2            # Poids des émotions
+clip_weight: 0.2               # Poids du scoring CLIP
+
+# Transcription
+enable_transcription: true     # Transcrire l'audio
+whisper_model: small           # tiny, base, small, medium, large
+whisper_language: fr           # fr, en, es, de, it, pt, auto
+
+# Qualité
+dedup_threshold: 5             # Seuil déduplication (1-20)
+min_sharpness: 10.0            # Netteté minimale (Laplacian)
+min_clip_quality_score: 0.2    # Score CLIP minimum
+require_face: false            # Forcer présence d'un visage
