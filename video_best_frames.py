@@ -51,8 +51,8 @@ class Moment:
 @dataclass
 class Frame:
     """Une frame extraite avec ses métadonnées."""
-    path: str                # Chemin du fichier JPEG
     timestamp_sec: float     # Position dans la vidéo
+    path: str = ""           # Chemin du fichier JPEG (rempli à l'export)
     score: float = 0.0       # Score global
     sharpness: float = 0.0   # Netteté (Laplacian)
     moment_index: int = -1   # Index du moment source
