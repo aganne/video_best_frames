@@ -72,7 +72,8 @@ DEFAULT_CONFIG = {
     "whisper_model": "small",
     "whisper_language": "fr",
     "dedup_threshold": 5,
-    "min_sharpness": 10.0,
+    "min_sharpness": 100.0,
+    "sharpness_threshold": 100.0,   # Netteté minimale pour le Pass 3 (QualityFilter) — valeurs typiques: <30 flou, 30-80 moyen, >80 net, >200 très net
     "min_clip_quality_score": 0.2,
     "require_face": False,
     "output_root": "./best_photos",
@@ -529,7 +530,8 @@ class QualityFilter:
         if not frames:
             return frames
 
-        min_sharpness = self.cfg.get("min_sharpness", 10.0)
+        # Utiliser sharpness_threshold si présent, sinon min_sharpness (backward compat)
+        min_sharpness = self.cfg.get("sharpness_threshold", self.cfg.get("min_sharpness", 100.0))
         require_face = self.cfg.get("require_face", False)
         min_quality = self.cfg.get("min_clip_quality_score", 0.2)
 
