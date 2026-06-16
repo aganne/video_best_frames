@@ -857,8 +857,7 @@ class VideoBestFrames:
             gps_lat = tags.get("com.apple.quicktime.location.ISO6709")
             if gps_lat:
                 # Format possible: "+48.8566+002.3522/" ou "+48.8566-002.3522/"
-                import re as _re
-                m = _re.match(r"([+-]\d+\.?\d*)([+-]\d+\.?\d*)/?", gps_lat)
+                m = re.match(r"([+-]\d+\.?\d*)([+-]\d+\.?\d*)/?", gps_lat)
                 if m:
                     meta["gps_lat"] = float(m.group(1))
                     meta["gps_lon"] = float(m.group(2))
@@ -928,7 +927,6 @@ class VideoBestFrames:
 
                 def _to_dms(dec: float) -> tuple:
                     """Convertit degrés décimaux → degrés, minutes, secondes pour EXIF."""
-                    sign = 1 if dec >= 0 else -1
                     dec = abs(dec)
                     d = int(dec)
                     m = int((dec - d) * 60)
