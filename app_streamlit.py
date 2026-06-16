@@ -66,12 +66,13 @@ def load_pipeline(use_clip, enable_transcription, whisper_model):
     déclenchent donc PAS de rechargement des modèles.
     """
     from video_best_frames import VideoBestFrames
-    return VideoBestFrames(
-        use_clip=use_clip,
-        dedup_threshold=5,
-        enable_transcription=enable_transcription,
-        whisper_model=whisper_model,
-    )
+    config = {
+        "use_clip": use_clip,
+        "dedup_threshold": 5,
+        "enable_transcription": enable_transcription,
+        "whisper_model": whisper_model,
+    }
+    return VideoBestFrames(config=config)
 
 @st.cache_resource(show_spinner="Chargement du modèle Whisper…")
 def load_transcriber(whisper_model: str, whisper_language: str):
