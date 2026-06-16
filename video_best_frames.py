@@ -586,32 +586,27 @@ class QualityFilter:
             if var < 100:
                 continue
 
-            # 4. Netteté sur le visage ? (optionnel)
+            # 4. Netteté sur le visage ? (optionnel via OpenCV Haar)
             face_sharpness = self.cfg.get("face_sharpness_threshold", 0.0)
             require_face = self.cfg.get("require_face", False)
             if face_sharpness > 0 or require_face:
                 try:
-                    import mediapipe as mp
-                    mp_face = mp.solutions.face_detection
-                    with mp_face.FaceDetection(min_detection_confidence=0.5) as fd:
-                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        results = fd.process(rgb)
-                        if results.detections:
-                            # Prendre le plus grand visage
-                            det = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width)
-                            box = det.location_data.relative_bounding_box
-                            h, w = frame.shape[:2]
-                            x1 = max(0, int(box.xmin * w))
-                            y1 = max(0, int(box.ymin * h))
-                            x2 = min(w, int((box.xmin + box.width) * w))
-                            y2 = min(h, int((box.ymin + box.height) * h))
-                            if x2 > x1 and y2 > y1:
-                                face_roi = gray[y1:y2, x1:x2]
+                    face_cascade = cv2.CascadeClassifier(
+                        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                    faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+                    if len(faces) > 0:
+                        any_face_blurry = False
+                        for (fx, fy, fw, fh) in faces:
+                            face_roi = gray[fy:fy+fh, fx:fx+fw]
+                            if face_roi.size > 0:
                                 face_sharp = cv2.Laplacian(face_roi, cv2.CV_64F).var()
                                 if face_sharpness > 0 and face_sharp < face_sharpness:
-                                    continue  # Visage trop flou
-                        elif require_face:
-                            continue  # Pas de visage mais obligatoire
+                                    any_face_blurry = True
+                                    break
+                        if any_face_blurry:
+                            continue  # Au moins un visage trop flou
+                    elif require_face:
+                        continue  # Pas de visage mais obligatoire
                 except Exception:
                     pass  # Skip face check on error
 
