@@ -77,6 +77,7 @@ DEFAULT_CONFIG = {
     "motion_blur_threshold": 0.20,  # Ratio de flou de mouvement (0-1). Plus bas = plus de flou directionnel. 0.20 = bon équilibre, désactiver = 0
     "min_clip_quality_score": 0.2,
     "require_face": False,
+    "face_sharpness_threshold": 50.0,  # Netteté minimale sur le visage détecté (0 = désactivé)
     "output_root": "./best_photos",
     "enable_transcription": True,
     "scene_weight": 0.3,
@@ -584,16 +585,32 @@ class QualityFilter:
             if var < 100:
                 continue
 
-            # 4. Visage présent ? (optionnel)
-            if require_face:
+            # 4. Netteté sur le visage ? (optionnel)
+            face_sharpness = self.cfg.get("face_sharpness_threshold", 0.0)
+            require_face = self.cfg.get("require_face", False)
+            if face_sharpness > 0 or require_face:
                 try:
                     import mediapipe as mp
                     mp_face = mp.solutions.face_detection
                     with mp_face.FaceDetection(min_detection_confidence=0.5) as fd:
                         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         results = fd.process(rgb)
-                        if not results.detections:
-                            continue
+                        if results.detections:
+                            # Prendre le plus grand visage
+                            det = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width)
+                            box = det.location_data.relative_bounding_box
+                            h, w = frame.shape[:2]
+                            x1 = max(0, int(box.xmin * w))
+                            y1 = max(0, int(box.ymin * h))
+                            x2 = min(w, int((box.xmin + box.width) * w))
+                            y2 = min(h, int((box.ymin + box.height) * h))
+                            if x2 > x1 and y2 > y1:
+                                face_roi = gray[y1:y2, x1:x2]
+                                face_sharp = cv2.Laplacian(face_roi, cv2.CV_64F).var()
+                                if face_sharpness > 0 and face_sharp < face_sharpness:
+                                    continue  # Visage trop flou
+                        elif require_face:
+                            continue  # Pas de visage mais obligatoire
                 except Exception:
                     pass  # Skip face check on error
 

@@ -27,3 +27,4 @@ sharpness_threshold: 100.0     # Seuil netteté Pass 3 (prioritaire sur min_shar
 motion_blur_threshold: 0.20    # Détection flou de mouvement (0=désactivé, 0.20=bon équilibre)
 min_clip_quality_score: 0.2    # Score CLIP minimum
 require_face: false            # Forcer présence d'un visage
+face_sharpness_threshold: 50.0 # Netteté minimale sur le visage détecté (0=désactivé)
