@@ -536,9 +536,12 @@ class QualityFilter:
         if not isinstance(raw, (int, float)) or raw is None:
             raw = self.cfg.get("min_sharpness", 100.0)
         min_sharpness = float(raw)
-        # Seuil de flou de mouvement (0 = désactivé)
+        # Seuil de flou de mouvement (0 = désactivé, clampé [0, 1])
         raw_mb = self.cfg.get("motion_blur_threshold", 0.20)
-        motion_blur_threshold = float(raw_mb) if isinstance(raw_mb, (int, float)) else 0.20
+        try:
+            motion_blur_threshold = max(0.0, min(1.0, float(raw_mb)))
+        except (TypeError, ValueError):
+            motion_blur_threshold = 0.20
         require_face = self.cfg.get("require_face", False)
         min_quality = self.cfg.get("min_clip_quality_score", 0.2)
 
