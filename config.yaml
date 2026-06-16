@@ -24,5 +24,6 @@ whisper_language: fr           # fr, en, es, de, it, pt, auto
 dedup_threshold: 5             # Seuil déduplication (1-20)
 min_sharpness: 100.0           # Netteté minimale (<30 flou, >80 net) — utilisé comme fallback
 sharpness_threshold: 100.0     # Seuil netteté Pass 3 (prioritaire sur min_sharpness)
+motion_blur_threshold: 0.20    # Détection flou de mouvement (0=désactivé, 0.20=bon équilibre)
 min_clip_quality_score: 0.2    # Score CLIP minimum
 require_face: false            # Forcer présence d'un visage

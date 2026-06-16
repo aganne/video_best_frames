@@ -74,6 +74,7 @@ DEFAULT_CONFIG = {
     "dedup_threshold": 5,
     "min_sharpness": 100.0,
     "sharpness_threshold": 100.0,   # Netteté minimale pour le Pass 3 (QualityFilter) — valeurs typiques: <30 flou, 30-80 moyen, >80 net, >200 très net
+    "motion_blur_threshold": 0.20,  # Ratio de flou de mouvement (0-1). Plus bas = plus de flou directionnel. 0.20 = bon équilibre, désactiver = 0
     "min_clip_quality_score": 0.2,
     "require_face": False,
     "output_root": "./best_photos",
@@ -535,6 +536,9 @@ class QualityFilter:
         if not isinstance(raw, (int, float)) or raw is None:
             raw = self.cfg.get("min_sharpness", 100.0)
         min_sharpness = float(raw)
+        # Seuil de flou de mouvement (0 = désactivé)
+        raw_mb = self.cfg.get("motion_blur_threshold", 0.20)
+        motion_blur_threshold = float(raw_mb) if isinstance(raw_mb, (int, float)) else 0.20
         require_face = self.cfg.get("require_face", False)
         min_quality = self.cfg.get("min_clip_quality_score", 0.2)
 
@@ -555,6 +559,17 @@ class QualityFilter:
             sharp = cv2.Laplacian(gray, cv2.CV_64F).var()
             if sharp < min_sharpness:
                 continue
+
+            # 1b. Flou de mouvement ? (détection directionnelle via Sobel)
+            if motion_blur_threshold > 0:
+                gx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+                gy = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+                mag_x = np.abs(gx).mean()
+                mag_y = np.abs(gy).mean()
+                # Ratio petit/grand gradient directionnel
+                motion_ratio = min(mag_x, mag_y) / max(mag_x, mag_y) if max(mag_x, mag_y) > 1e-6 else 1.0
+                if motion_ratio < motion_blur_threshold:
+                    continue
 
             # 2. Pas trop sombre ?
             mean = np.mean(gray)
