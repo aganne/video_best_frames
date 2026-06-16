@@ -531,7 +531,10 @@ class QualityFilter:
             return frames
 
         # Utiliser sharpness_threshold si présent, sinon min_sharpness (backward compat)
-        min_sharpness = self.cfg.get("sharpness_threshold", self.cfg.get("min_sharpness", 100.0))
+        raw = self.cfg.get("sharpness_threshold")
+        if not isinstance(raw, (int, float)) or raw is None:
+            raw = self.cfg.get("min_sharpness", 100.0)
+        min_sharpness = float(raw)
         require_face = self.cfg.get("require_face", False)
         min_quality = self.cfg.get("min_clip_quality_score", 0.2)
 
