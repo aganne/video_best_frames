@@ -78,6 +78,7 @@ DEFAULT_CONFIG = {
     "min_clip_quality_score": 0.2,
     "require_face": False,
     "face_sharpness_threshold": 50.0,  # Netteté minimale sur le visage détecté (0 = désactivé)
+    "obstruction_threshold": 0.25,     # Ratio max de zone obstruée/uniforme (0=désactivé, 0.25=25% max)
     "output_root": "./best_photos",
     "enable_transcription": True,
     "scene_weight": 0.3,
@@ -613,6 +614,22 @@ class QualityFilter:
                             continue  # Pas de visage mais obligatoire
                 except Exception:
                     pass  # Skip face check on error
+
+            # 5. Obstruction (main devant l'objectif, poche, etc.)
+            obstruction_max = self.cfg.get("obstruction_threshold", 0.25)
+            if obstruction_max > 0:
+                h, w = gray.shape
+                rows, cols = 6, 8
+                cell_h, cell_w = h // rows, w // cols
+                uniform_cells = 0
+                total_cells = rows * cols
+                for r in range(rows):
+                    for c in range(cols):
+                        cell = gray[r*cell_h:(r+1)*cell_h, c*cell_w:(c+1)*cell_w]
+                        if cell.size > 0 and cv2.Laplacian(cell, cv2.CV_64F).var() < 15:
+                            uniform_cells += 1
+                if uniform_cells / total_cells > obstruction_max:
+                    continue  # Trop de zones uniformes = obstruction probable
 
             kept.append(f)
 
