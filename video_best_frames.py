@@ -779,8 +779,9 @@ class VideoBestFrames:
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS) or 30
 
-        # Lire la date de création de la vidéo
-        creation_date = self._get_video_creation_date(video_path)
+        # Lire les métadonnées de la vidéo source (date, appareil, GPS…)
+        meta = self._get_video_metadata(video_path)
+        creation_date = meta.get("creation_date")
         video_name = Path(video_path).stem
 
         exported = 0
@@ -801,9 +802,8 @@ class VideoBestFrames:
             pil_img = Image.fromarray(rgb)
             pil_img.save(fpath, "JPEG", quality=95)
 
-            # Injecter EXIF
-            if creation_date:
-                self._inject_exif(str(fpath), creation_date, f.timestamp_sec, video_name)
+            # Injecter EXIF (date, appareil, GPS)
+            self._inject_exif(str(fpath), creation_date, f.timestamp_sec, video_name, meta)
 
             f.path = str(fpath)
             exported += 1
@@ -811,32 +811,78 @@ class VideoBestFrames:
         cap.release()
         return {"exported": exported}
 
-    def _get_video_creation_date(self, video_path: str) -> Optional[str]:
-        """Extrait la date de création de la vidéo via ffprobe."""
+    def _get_video_metadata(self, video_path: str) -> dict:
+        """Extrait les métadonnées de la vidéo source via ffprobe.
+
+        Retourne un dict avec:
+          - creation_date: str (format EXIF \"YYYY:MM:DD HH:MM:SS\") ou None
+          - make: str (ex: \"Apple\") ou None
+          - model: str (ex: \"iPhone 14\") ou None
+          - software: str (ex: \"16.6\") ou None
+          - gps_lat: float ou None
+          - gps_lon: float ou None
+        """
+        meta: dict = {}
+
+        # Lire les tags du format via ffprobe
         try:
             result = subprocess.run(
-                ["ffprobe", "-v", "quiet", "-show_entries", "format_tags=creation_time",
-                 "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+                ["ffprobe", "-v", "quiet", "-print_format", "json",
+                 "-show_entries", "format_tags", video_path],
                 capture_output=True, text=True, timeout=10,
             )
-            date_str = result.stdout.strip()
+            data = json.loads(result.stdout) if result.stdout.strip() else {}
+            tags = data.get("format", {}).get("tags", {})
+
+            # Date de création — plusieurs sources possibles
+            date_str = (
+                tags.get("com.apple.quicktime.creationdate")
+                or tags.get("creation_time")
+            )
             if date_str:
-                # Formater en EXIF : "2025:01:15 14:30:00"
-                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                return dt.strftime("%Y:%m:%d %H:%M:%S")
+                try:
+                    # Formater en EXIF : "2025:01:15 14:30:00"
+                    dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                    meta["creation_date"] = dt.strftime("%Y:%m:%d %H:%M:%S")
+                except Exception:
+                    pass
+
+            # Appareil
+            make = tags.get("com.apple.quicktime.make")
+            if make:
+                meta["make"] = make
+            model = tags.get("com.apple.quicktime.model")
+            if model:
+                meta["model"] = model
+            software = tags.get("com.apple.quicktime.software")
+            if software:
+                meta["software"] = software
+
+            # GPS : chercher dans les tags
+            gps_lat = tags.get("com.apple.quicktime.location.ISO6709")
+            if gps_lat:
+                # Format possible: "+48.8566+002.3522/" ou "+48.8566-002.3522/"
+                m = re.match(r"([+-]\d+\.?\d*)([+-]\d+\.?\d*)/?", gps_lat)
+                if m:
+                    meta["gps_lat"] = float(m.group(1))
+                    meta["gps_lon"] = float(m.group(2))
+
         except Exception:
             pass
 
-        # Fallback : date du fichier
-        try:
-            mtime = os.path.getmtime(video_path)
-            dt = datetime.fromtimestamp(mtime)
-            return dt.strftime("%Y:%m:%d %H:%M:%S")
-        except Exception:
-            return None
+        # Fallback date : date du fichier
+        if not meta.get("creation_date"):
+            try:
+                mtime = os.path.getmtime(video_path)
+                dt = datetime.fromtimestamp(mtime)
+                meta["creation_date"] = dt.strftime("%Y:%m:%d %H:%M:%S")
+            except Exception:
+                pass
 
-    def _inject_exif(self, jpeg_path: str, creation_date: str, timestamp_sec: float, video_name: str):
-        """Injecte les métadonnées EXIF dans le JPEG."""
+        return meta
+
+    def _inject_exif(self, jpeg_path: str, creation_date: str, timestamp_sec: float, video_name: str, video_meta: dict = None):
+        """Injecte les métadonnées EXIF dans le JPEG (date, appareil, GPS)."""
         try:
             import piexif
             from PIL import Image as PILImage
@@ -844,23 +890,62 @@ class VideoBestFrames:
             img = PILImage.open(jpeg_path)
 
             # Ajuster la date en fonction du timestamp dans la vidéo
-            try:
-                base_dt = datetime.strptime(creation_date, "%Y:%m:%d %H:%M:%S")
-                frame_dt = base_dt + timedelta(seconds=timestamp_sec)
-                exif_date = frame_dt.strftime("%Y:%m:%d %H:%M:%S")
-            except Exception:
-                exif_date = creation_date
+            if creation_date:
+                try:
+                    base_dt = datetime.strptime(creation_date, "%Y:%m:%d %H:%M:%S")
+                    frame_dt = base_dt + timedelta(seconds=timestamp_sec)
+                    exif_date = frame_dt.strftime("%Y:%m:%d %H:%M:%S")
+                except Exception:
+                    exif_date = creation_date
+            else:
+                exif_date = None
+
+            # Valeurs par défaut
+            make = "Apple"
+            model = "iPhone"
+            software = "video_best_frames"
+            if video_meta:
+                make = video_meta.get("make", make)
+                model = video_meta.get("model", model)
+                software = video_meta.get("software", software) or software
 
             exif_dict = {
                 "Exif": {
-                    piexif.ExifIFD.DateTimeOriginal: exif_date,
                     piexif.ExifIFD.UserComment: f"Video: {video_name} @ {timestamp_sec:.1f}s".encode("utf-8"),
                 },
                 "0th": {
-                    piexif.ImageIFD.Make: "Hermes Video Extractor",
-                    piexif.ImageIFD.Software: "video_best_frames",
+                    piexif.ImageIFD.Make: make,
+                    piexif.ImageIFD.Model: model,
+                    piexif.ImageIFD.Software: software,
                 },
             }
+
+            # Date
+            if exif_date:
+                exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = exif_date
+                exif_dict["0th"][piexif.ImageIFD.DateTime] = exif_date
+
+            # GPS
+            if video_meta and video_meta.get("gps_lat") is not None and video_meta.get("gps_lon") is not None:
+                lat = video_meta["gps_lat"]
+                lon = video_meta["gps_lon"]
+
+                def _to_dms(dec: float) -> tuple:
+                    """Convertit degrés décimaux → degrés, minutes, secondes pour EXIF."""
+                    dec = abs(dec)
+                    d = int(dec)
+                    m = int((dec - d) * 60)
+                    s = (dec - d - m / 60) * 3600
+                    return (d, 1), (m, 1), (int(s * 1000), 1000)
+
+                lat_ref = "N" if lat >= 0 else "S"
+                lon_ref = "E" if lon >= 0 else "W"
+                exif_dict["GPS"] = {
+                    piexif.GPSIFD.GPSLatitudeRef: lat_ref,
+                    piexif.GPSIFD.GPSLatitude: _to_dms(lat),
+                    piexif.GPSIFD.GPSLongitudeRef: lon_ref,
+                    piexif.GPSIFD.GPSLongitude: _to_dms(lon),
+                }
 
             exif_bytes = piexif.dump(exif_dict)
             piexif.insert(exif_bytes, jpeg_path)

@@ -1,19 +1,16 @@
-# Videos (too large for git) — toutes les casses
+# Videos (too large for git)
 /videos/*.MOV
 /videos/*.mov
-/videos/*.Mp4
 /videos/*.mp4
-/videos/*.MP4
-/videos/*.Avi
 /videos/*.avi
-/videos/*.AVI
-/videos/*.Mkv
 /videos/*.mkv
-/videos/*.MKV
+videos/*.MOV
+videos/*.mov
+videos/*.mp4
 
 # Output
 /best_photos/
-/output/
+best_photos/
 
 # Python
 __pycache__/
