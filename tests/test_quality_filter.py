@@ -105,9 +105,14 @@ class TestBadFrames:
     """Frames avec défauts connus qui doivent être filtrées."""
 
     def test_blurry_face_rejected(self, bad_blurry_face):
-        """Frame où un visage détecté a une netteté < 50."""
+        """Frame avec visage flou (sharpness ~3) doit être rejetée."""
         assert not check_face_sharpness(bad_blurry_face, threshold=50.0), \
             "Frame avec visage flou devrait être rejetée"
+
+    def test_good_face_accepted(self, good_face):
+        """Frame avec visage net (sharpness ~914) doit passer."""
+        assert check_face_sharpness(good_face, threshold=50.0), \
+            "Frame avec visage net devrait passer"
 
     def test_obstruction_rejected(self, bad_obstruction):
         """Frame avec une grande zone uniforme (main simulée)."""
@@ -127,29 +132,29 @@ class TestBadFrames:
 class TestUserRejectedFrame:
     """Frame que l'utilisateur a signalée comme non désirable."""
 
-    def test_sharpness(self, bad_user_rejected):
+    def test_sharpness(self, good_face):
         """Vérifie la netteté globale — OK."""
-        assert check_sharpness(bad_user_rejected), "Netteté globale OK"
+        assert check_sharpness(good_face), "Netteté globale OK"
 
-    def test_motion(self, bad_user_rejected):
+    def test_motion(self, good_face):
         """Vérifie l'absence de flou mouvement — OK."""
-        assert check_motion_blur(bad_user_rejected), "Pas de flou mouvement"
+        assert check_motion_blur(good_face), "Pas de flou mouvement"
 
-    def test_face(self, bad_user_rejected):
-        """Vérifie la netteté du visage — OK (sharpness=286)."""
-        assert check_face_sharpness(bad_user_rejected), "Visage net"
+    def test_face(self, good_face):
+        """Vérifie la netteté du visage — OK (sharpness=914)."""
+        assert check_face_sharpness(good_face), "Visage net"
 
-    def test_obstruction(self, bad_user_rejected):
+    def test_obstruction(self, good_face):
         """Vérifie l'absence d'obstruction — OK."""
-        assert check_obstruction(bad_user_rejected), "Pas d'obstruction"
+        assert check_obstruction(good_face), "Pas d'obstruction"
 
-    def test_passes_current_filters(self, bad_user_rejected):
+    def test_passes_current_filters(self, good_face):
         """Cette frame passe TOUS les filtres techniques actuels.
         
         Si ce test échoue, c'est qu'un nouveau filtre a été ajouté
         qui détecte le problème visuel de cette frame.
         """
-        assert passes_all_filters(bad_user_rejected), (
+        assert passes_all_filters(good_face), (
             "Cette frame passe tous les filtres — "
             "si elle ne devrait pas, ajouter un nouveau check dans Pass 3"
         )

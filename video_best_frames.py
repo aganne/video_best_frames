@@ -587,7 +587,7 @@ class QualityFilter:
                 continue
 
             # 4. Netteté sur le visage ? (optionnel via OpenCV Haar)
-            face_sharpness = self.cfg.get("face_sharpness_threshold", 0.0)
+            face_sharpness = self.cfg.get("face_sharpness_threshold", 50.0)
             require_face = self.cfg.get("require_face", False)
             if face_sharpness > 0 or require_face:
                 try:
